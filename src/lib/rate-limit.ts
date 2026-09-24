@@ -34,14 +34,6 @@ async function redis(commands: string[][]): Promise<{ result: unknown }[] | null
   }
 }
 
-/** Current count in the window, without adding to it. */
-export async function peek(key: string): Promise<number> {
-  const r = await redis([["GET", `rl:${key}`]]);
-  if (r) return Number(r[0]?.result ?? 0) || 0;
-  const entry = memory.get(key);
-  return entry && entry.resetAt > Date.now() ? entry.count : 0;
-}
-
 /** Adds one to the window's count and returns the new total. */
 export async function bump(key: string, windowSec: number): Promise<number> {
   const r = await redis([
@@ -61,6 +53,14 @@ export async function bump(key: string, windowSec: number): Promise<number> {
   }
   entry.count += 1;
   return entry.count;
+}
+
+/** Gives back one count (e.g. a reserved failure slot when the attempt succeeded). */
+export async function unbump(key: string): Promise<void> {
+  const r = await redis([["DECR", `rl:${key}`]]);
+  if (r) return;
+  const entry = memory.get(key);
+  if (entry && entry.count > 0) entry.count -= 1;
 }
 
 /** Counts this request and reports whether it is still within the limit. */

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { COOKIE_MAX_AGE, COOKIE_NAME, checkPassword } from "@/lib/password";
-import { bump, clientIp, peek } from "@/lib/rate-limit";
+import { bump, clientIp, unbump } from "@/lib/rate-limit";
 import { isSameOrigin } from "@/lib/same-origin";
 
 export const dynamic = "force-dynamic";
@@ -40,8 +40,10 @@ export async function POST(request: Request) {
 
   if (!isSameOrigin(request)) return respond("forbidden");
 
+  // Reserve a failure slot up front (atomic INCR), so a burst of parallel
+  // guesses can't all slip past the check; a correct password refunds it.
   const failKey = `unlock-fail:${clientIp(request.headers)}`;
-  if ((await peek(failKey)) >= MAX_FAILURES) return respond("limited");
+  if ((await bump(failKey, WINDOW_SEC)) > MAX_FAILURES) return respond("limited");
 
   let password = "";
   try {
@@ -55,13 +57,14 @@ export async function POST(request: Request) {
   } catch {
     // treated as empty
   }
-  if (!password.trim()) return respond("empty");
+  if (!password.trim()) {
+    await unbump(failKey);
+    return respond("empty");
+  }
 
   const token = checkPassword(password);
-  if (!token) {
-    await bump(failKey, WINDOW_SEC);
-    return respond("wrong");
-  }
+  if (!token) return respond("wrong");
+  await unbump(failKey);
   return respond("ok", token);
 }
 

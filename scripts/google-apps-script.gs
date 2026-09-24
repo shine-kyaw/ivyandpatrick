@@ -51,14 +51,31 @@ function doPost(e) {
     lock.waitLock(20000);
     try {
       sheet.appendRow(HEADERS.map((h) => safe(row[h])));
+      try {
+        updateSummary(ss);
+      } catch (summaryErr) {
+        // The reply is saved; a summary hiccup must not report it as failed.
+        console.error("summary failed: " + summaryErr);
+      }
     } finally {
       lock.releaseLock();
     }
-    updateSummary(ss);
     return json({ ok: true });
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
+}
+
+/** Adds "RSVP → Refresh summary" to the sheet menu, for after manual edits. */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("RSVP")
+    .addItem("Refresh summary", "refreshSummary")
+    .addToUi();
+}
+
+function refreshSummary() {
+  updateSummary(SpreadsheetApp.getActiveSpreadsheet());
 }
 
 function doGet() {
@@ -88,12 +105,26 @@ function updateSummary(ss) {
   const rows = responses.getLastRow() > 1 ? responses.getRange(2, 1, responses.getLastRow() - 1, HEADERS.length).getValues() : [];
   const col = (name) => HEADERS.indexOf(name);
 
+  // One person = same phone AND same name, so a household replying for each
+  // member from one phone is still counted per person. "Latest" is by
+  // submitted_at, so sorting the Responses tab never changes the totals.
+  const norm = (v) => String(v || "").replace(/^'/, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const stamp = (r) => {
+    const v = r[col("submitted_at")];
+    return v instanceof Date ? v.toISOString() : String(v);
+  };
   const latest = new Map();
+  const namesByPhone = new Map();
   rows.forEach((r) => {
-    const key = String(r[col("phone_digits")] || "").replace(/^'/, "") || "name:" + String(r[col("name")]).toLowerCase();
-    latest.set(key, r); // rows are in submission order, so the last one wins
+    const phone = norm(r[col("phone_digits")]);
+    const name = norm(r[col("name")]);
+    const key = phone + "|" + name;
+    const prev = latest.get(key);
+    if (!prev || stamp(r) >= stamp(prev)) latest.set(key, r);
+    if (phone) namesByPhone.set(phone, (namesByPhone.get(phone) || new Set()).add(name));
   });
   const current = Array.from(latest.values());
+  const sharedPhones = Array.from(namesByPhone.values()).filter((names) => names.size > 1).length;
 
   const count = (list, fn) => list.filter(fn).length;
   const yes = (r) => r[col("attending")] === "yes";
@@ -101,7 +132,7 @@ function updateSummary(ss) {
   const diet = (list, opt) => count(list, (r) => yes(r) && String(r[col("dietary")]).split(", ").indexOf(opt) !== -1);
 
   const table = [
-    ["Latest reply per guest (by phone)", ""],
+    ["Latest reply per guest (same phone + name)", ""],
     ["Guests replied", current.length],
     ["Accepting", count(current, yes)],
     ["…bringing a guest", count(current, guest)],
@@ -117,13 +148,15 @@ function updateSummary(ss) {
     ["Other notes", count(current, (r) => yes(r) && String(r[col("dietary_other")]).trim() !== "")],
     ["", ""],
     ["All submissions (including changed answers)", rows.length],
+    ["Phones used by more than one name (check)", sharedPhones],
     // Sheets may turn "TRUE" into a boolean on append, so compare case-insensitively.
     ["Late replies", count(rows, (r) => String(r[col("late")]).toUpperCase() === "TRUE")],
   ];
 
   let sheet = ss.getSheetByName("Summary");
   if (!sheet) sheet = ss.insertSheet("Summary");
-  sheet.clearContents();
+  // Only columns A:B belong to this summary; notes elsewhere on the tab survive.
+  sheet.getRange(1, 1, Math.max(sheet.getLastRow(), table.length), 2).clearContent();
   sheet.getRange(1, 1, table.length, 2).setValues(table);
   sheet.getRange("A1:A").setFontWeight("bold");
   sheet.setColumnWidth(1, 300);

@@ -19,8 +19,9 @@ export async function POST(request: Request) {
   if (!isSameOrigin(request)) return fail("forbidden", 403);
   if (!(await isUnlocked())) return fail("locked", 401);
 
-  // Generous: several guests may reply from one shared IP (office Wi-Fi, carrier NAT).
-  if (!(await rateLimit(`rsvp:${clientIp(request.headers)}`, 40, 600))) return fail("rate_limited", 429);
+  // Only a flood guard: replying already requires the password, and many real
+  // guests can share one public IP (office Wi-Fi, carrier NAT).
+  if (!(await rateLimit(`rsvp:${clientIp(request.headers)}`, 120, 600))) return fail("rate_limited", 429);
 
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) return fail("invalid", 413);

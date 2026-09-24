@@ -292,7 +292,6 @@ a {
 .gate__panel {
   position: relative;
   margin: 17% 9% 15%;
-  padding: 4% 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -419,6 +418,12 @@ a {
   .gate__form {
     margin-top: 10px;
   }
+}
+
+/* With an error showing, the hint and greeting step aside so the card keeps
+   its printed proportions instead of stretching. */
+.gate__panel:has(.gate__error:not(:empty)) :is(.gate__hint, .gate__invited) {
+  display: none;
 }
 
 .gate[lang="my"] .gate__hint,

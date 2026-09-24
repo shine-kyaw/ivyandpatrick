@@ -242,7 +242,8 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
                             focusField(x.field);
                           }}
                         >
-                          {labelFor(x.field, t)} — {message(x.field, x.code)}
+                          {labelFor(x.field, t)}
+                          {errorFor(x.field) === x.code && <> — {message(x.field, x.code)}</>}
                         </a>
                       </li>
                     ))}
