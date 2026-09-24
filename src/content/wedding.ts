@@ -34,7 +34,7 @@ export type Wedding = {
 
 export const wedding: Wedding = {
   date: "2027-03-28",
-  ceremony: { start: "11:00", end: "11:30" },
+  ceremony: { start: "11:00", end: "13:30" },
   venue: {
     name: "Lotte Ballroom",
     address: null,
@@ -72,7 +72,7 @@ export const couple = {
 export const cardText = {
   title: "စုလျားရစ်ပတ်ထိမ်းမြားမင်္ဂလာဖိတ်ကြားလွှာ",
   body: "တို့ကိုနှစ်ဖက်မိဘတို့၏ ဝတ္တရားရှိသည်နှင့်အညီ “စုလျားရစ်ပတ် ထိမ်းမြားမင်္ဂလာ” ဆောင်နှင်းမည်ဖြစ်ပါ၍ ကြွရောက်ချီးမြှင့်ပေးပါရန် ခင်မင်လေးစားစွာဖြင့် ဖိတ်ကြားအပ်ပါသည်။",
-  time: "နံနက် (၁၁:၀၀)နာရီ မှ (၁၁:၃၀)နာရီအထိ",
+  time: "နံနက် (၁၁:၀၀)နာရီ မှ (၁:၃၀)နာရီအထိ",
   date: "၂၈ရက်၊ မတ်လ၊ ၂၀၂၇ခုနှစ်",
 } as const;
 

@@ -69,7 +69,7 @@ export default function Hero({ lang, content, onViewCard }: Props) {
           decoding="async"
         />
         <div className="invite__body">
-          <h1 id="hero-title" className="sr-only">
+          <h1 id="hero-title" className="sr-only" tabIndex={-1}>
             {lang === "my" ? `${couple.groom.nameMy} နှင့် ${couple.bride.nameMy}` : "Patrick and Ivy"} — {t.gate.kicker}
           </h1>
 

@@ -49,6 +49,12 @@ html {
   scroll-padding-top: 80px;
 }
 
+@media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}
+
 body {
   margin: 0;
   background: var(--paper);
@@ -267,8 +273,11 @@ a {
 
 .gate__card {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   width: min(90vw, 450px, calc((100svh - 170px) * 860 / 1185));
-  min-width: 280px;
+  min-width: min(280px, 100%);
   aspect-ratio: 860 / 1185;
 }
 
@@ -281,8 +290,9 @@ a {
 }
 
 .gate__panel {
-  position: absolute;
-  inset: 13% 9% 11%;
+  position: relative;
+  margin: 17% 9% 15%;
+  padding: 4% 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -316,8 +326,7 @@ a {
 }
 
 .gate__amp,
-.footer__amp,
-.reveal__names span {
+.footer__amp {
   font-style: italic;
   font-weight: 400;
   color: var(--gold-ink);
@@ -402,6 +411,21 @@ a {
   .gate__hint {
     display: none;
   }
+
+  .gate__names {
+    font-size: 32px;
+  }
+
+  .gate__form {
+    margin-top: 10px;
+  }
+}
+
+.gate[lang="my"] .gate__hint,
+.gate[lang="my"] .gate__error,
+.gate[lang="my"] .gate__lost,
+[lang="my"] .field__error {
+  line-height: 1.85;
 }
 
 /* ------------------------------------------------------------------ reveal (signature moment) */
@@ -463,16 +487,11 @@ a {
   animation: door-right 1.45s 0.35s cubic-bezier(0.62, 0.04, 0.3, 1) both;
 }
 
-.reveal__names {
+.reveal__wash {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-family: var(--f-display);
-  font-weight: 500;
-  font-size: clamp(34px, 9.4vw, 50px);
-  color: var(--ink);
-  animation: reveal-fade 0.4s 0.05s var(--ease) both;
+  inset: 17% 9% 15%;
+  background: radial-gradient(ellipse 66% 58% at 50% 52%, rgba(252, 251, 247, 0.96) 60%, rgba(252, 251, 247, 0.7) 80%, rgba(252, 251, 247, 0) 100%);
+  animation: reveal-fade 0.45s var(--ease) both;
 }
 
 .reveal__skip {
@@ -533,7 +552,7 @@ a {
   animation-delay: 1.2s;
 }
 
-.is-revealing .person:last-of-type {
+.is-revealing .invite__and + .person {
   animation-delay: 1.3s;
 }
 
@@ -605,6 +624,7 @@ a {
 
 .hero {
   position: relative;
+  overflow-x: hidden;
   overflow-x: clip;
   padding-top: clamp(56px, 9vw, 84px);
   background:
@@ -941,6 +961,7 @@ a {
 
 .details {
   position: relative;
+  overflow: hidden;
   overflow: clip;
   padding: clamp(84px, 12vw, 128px) var(--gutter) clamp(72px, 10vw, 112px);
 }
@@ -1047,6 +1068,7 @@ a {
 
 .rsvp {
   position: relative;
+  overflow: hidden;
   overflow: clip;
   padding: clamp(72px, 11vw, 120px) var(--gutter);
   background:
@@ -1333,9 +1355,18 @@ textarea.field__input {
   cursor: pointer;
 }
 
+.choice__input:focus-visible + .choice__mark {
+  outline: 2px solid var(--gold-ink);
+  outline-offset: 3px;
+}
+
 .choice:has(.choice__input:focus-visible) {
   outline: 2px solid var(--gold-ink);
   outline-offset: 2px;
+}
+
+.choice:has(.choice__input:focus-visible) .choice__mark {
+  outline: none;
 }
 
 .choice__mark {
@@ -1760,6 +1791,11 @@ textarea.field__input {
   cursor: pointer;
 }
 
+.card-dialog__close:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
+}
+
 .card-dialog__close svg {
   width: 14px;
   height: 14px;
@@ -1790,8 +1826,7 @@ textarea.field__input {
     transition-duration: 0.01ms !important;
   }
 
-  .reveal__door,
-  .reveal__names {
+  .reveal {
     display: none;
   }
 }

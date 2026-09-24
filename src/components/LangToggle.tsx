@@ -50,10 +50,10 @@ export default function LangToggle({ lang, onChange, labels }: Props) {
           lang={l}
           className="lang-toggle__btn"
           aria-pressed={lang === l}
-          aria-label={lang === l ? labels[l].langName : labels[l].switchTo}
+          title={lang === l ? undefined : labels[l].switchTo}
           onClick={() => lang !== l && onChange(l)}
         >
-          {l === "en" ? "EN" : labels.my.langName}
+          {labels[l].langName}
         </button>
       ))}
     </div>

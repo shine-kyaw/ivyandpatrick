@@ -78,6 +78,20 @@ export function clean(value: unknown, multiline = false): string {
   return v.trim();
 }
 
+/**
+ * Numbers pasted from contacts, Viber or WhatsApp often carry invisible
+ * direction marks and typographic dashes. Normalise them away before checking.
+ */
+export function normalisePhone(phone: string): string {
+  let out = "";
+  for (const ch of phone) {
+    const c = ch.codePointAt(0)!;
+    if ((c >= 0x2010 && c <= 0x2015) || c === 0x2212) out += "-";
+    else if (!/\p{Cf}/u.test(ch)) out += ch;
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
+
 export function phoneDigits(phone: string): string {
   // Myanmar numerals typed on a Burmese keyboard count as digits too.
   const western = phone.replace(/[၀-၉]/g, (d) => String(d.charCodeAt(0) - 0x1040));
@@ -126,9 +140,10 @@ export function validateField(field: Field, v: RsvpInput): ErrorCode | undefined
     case "plusOne":
       return v.plusOne === "yes" || v.plusOne === "no" ? undefined : "choose";
     case "phone": {
-      if (!v.phone) return "required";
-      if (v.phone.length > LIMITS.phoneRaw || !PHONE_CHARS.test(v.phone)) return "phone";
-      const n = phoneDigits(v.phone).length;
+      const phone = normalisePhone(v.phone);
+      if (!phone) return "required";
+      if (phone.length > LIMITS.phoneRaw || !PHONE_CHARS.test(phone)) return "phone";
+      const n = phoneDigits(phone).length;
       return n < LIMITS.phoneDigits.min || n > LIMITS.phoneDigits.max ? "phone" : undefined;
     }
     case "email":
@@ -157,7 +172,7 @@ export function validate(v: RsvpInput): Errors {
 export function parse(body: unknown): RsvpInput | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const b = body as Record<string, unknown>;
-  const allowed = new Set<string>([...FIELD_ORDER, "website", "startedAt", "lang"]);
+  const allowed = new Set<string>([...FIELD_ORDER, "website", "elapsedMs", "lang"]);
   if (Object.keys(b).some((k) => !allowed.has(k))) return null;
 
   const pick = <T extends string>(x: unknown, opts: readonly T[]): T | "" =>
@@ -173,7 +188,7 @@ export function parse(body: unknown): RsvpInput | null {
     attending: pick(b.attending, ["yes", "no"] as const),
     plusOne: pick(b.plusOne, ["yes", "no"] as const),
     plusOneName: clean(b.plusOneName),
-    phone: clean(b.phone),
+    phone: normalisePhone(clean(b.phone)),
     email: clean(b.email).toLowerCase(),
     dietary: [...new Set(dietary)],
     dietaryOther: clean(b.dietaryOther),

@@ -8,6 +8,7 @@ import {
   FIELD_ORDER,
   LIMITS,
   isVisible,
+  normalisePhone,
   prune,
   validate,
   validateField,
@@ -21,6 +22,9 @@ import { Divider, Sprig } from "./Ornament";
 import type { Lang, SiteContent } from "./types";
 
 const DRAFT_KEY = "pi:rsvp-draft";
+const MIN_FORM_MS = 3000; // must match the API's bot threshold
+const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 type FailureCode = "network" | "not_configured" | "rate_limited" | "locked" | "invalid";
 type Status = { kind: "idle" } | { kind: "sending" } | { kind: "failed"; code: FailureCode } | { kind: "done"; sent: RsvpInput };
 
@@ -58,24 +62,33 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
   const [values, setValues] = useState<RsvpInput>(EMPTY_RSVP);
   const [shown, setShown] = useState<Set<Field>>(new Set());
   const [status, setStatus] = useState<Status>({ kind: "idle" });
-  const [showSummary, setShowSummary] = useState(false);
+  // Errors as they stood at the last submit: the summary only changes on submit,
+  // so screen readers don't re-read the whole alert while a guest types a fix.
+  const [summary, setSummary] = useState<{ field: Field; code: ErrorCode }[]>([]);
   const [serverErrors, setServerErrors] = useState<Errors>({});
-  const startedAt = useRef(0);
+  // False until the form has hydrated and restored any draft. Until then the
+  // submit button stays disabled, so an early tap can't fall back to a native
+  // submission.
+  const [ready, setReady] = useState(false);
+  // Time on the form, measured on this device only (performance.now), so a
+  // phone with a wrong clock can never be mistaken for a bot.
+  const mountedAt = useRef(0);
   const honeypot = useRef<HTMLInputElement>(null);
   const doneHeading = useRef<HTMLHeadingElement>(null);
   const failRef = useRef<HTMLDivElement>(null);
-  const restored = useRef(false);
 
   useEffect(() => {
-    startedAt.current = Date.now();
+    mountedAt.current = performance.now();
     const draft = readDraft();
     if (draft) setValues(draft);
-    restored.current = true;
+    setReady(true);
   }, []);
 
   useEffect(() => {
-    if (restored.current && status.kind !== "done") writeDraft(values);
-  }, [values, status.kind]);
+    // Skips the first commit, which still holds the empty form, so a saved
+    // draft is never overwritten before it has been restored.
+    if (ready && status.kind !== "done") writeDraft(values);
+  }, [ready, values, status.kind]);
 
   useEffect(() => {
     if (status.kind === "done") doneHeading.current?.focus();
@@ -108,27 +121,31 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
       ...values,
       name: values.name.trim(),
       plusOneName: values.plusOneName.trim(),
-      phone: values.phone.trim(),
+      phone: normalisePhone(values.phone),
       email: values.email.trim(),
     });
     const errors = validate(clean);
     const invalid = FIELD_ORDER.filter((f) => errors[f]);
     if (invalid.length) {
       setShown(new Set(FIELD_ORDER));
-      setShowSummary(true);
+      setSummary(invalid.map((f) => ({ field: f, code: errors[f]! })));
       focusField(invalid[0]);
       return;
     }
-    setShowSummary(false);
+    setSummary([]);
     setStatus({ kind: "sending" });
     try {
+      // Someone replying within 3 s of the page loading (e.g. a restored draft)
+      // just waits a moment under "Sending…" instead of tripping the bot check.
+      const elapsed = performance.now() - mountedAt.current;
+      if (elapsed < MIN_FORM_MS) await wait(MIN_FORM_MS - elapsed + 50);
       const res = await fetch("/api/rsvp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...clean,
           website: honeypot.current?.value ?? "",
-          startedAt: startedAt.current,
+          elapsedMs: Math.round(performance.now() - mountedAt.current),
           lang,
         }),
       });
@@ -139,9 +156,10 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
         return;
       }
       if (res.status === 422 && data.errors) {
-        setServerErrors(data.errors);
+        const server = data.errors;
+        setServerErrors(server);
         setShown(new Set(FIELD_ORDER));
-        setShowSummary(true);
+        setSummary(FIELD_ORDER.filter((f) => server[f]).map((f) => ({ field: f, code: server[f]! })));
         setStatus({ kind: "idle" });
         const first = FIELD_ORDER.find((f) => data.errors?.[f]);
         if (first) focusField(first);
@@ -159,8 +177,8 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
       const el =
         document.getElementById(id(f)) ??
         (document.querySelector(`[data-field="${f}"] input`) as HTMLElement | null);
-      el?.focus();
-      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      el?.focus({ preventScroll: true });
+      el?.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
     });
   }
 
@@ -168,8 +186,8 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
     setValues(EMPTY_RSVP);
     setShown(new Set());
     setServerErrors({});
-    setShowSummary(false);
-    startedAt.current = Date.now();
+    setSummary([]);
+    mountedAt.current = performance.now();
     setStatus({ kind: "idle" });
     requestAnimationFrame(() => document.getElementById(id("name"))?.focus());
   }
@@ -204,28 +222,30 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
             onAnother={startAnother}
           />
         ) : (
-          <form className="form" onSubmit={submit} noValidate aria-describedby={id("req")}>
+          <form className="form" method="post" onSubmit={submit} noValidate aria-describedby={id("req")}>
             <p id={id("req")} className="form__note">
               {t.requiredNote}
             </p>
 
-            {showSummary && FIELD_ORDER.some((f) => errorFor(f)) && (
+            {summary.some((x) => errorFor(x.field)) && (
               <div className="form__summary" role="alert">
                 <p className="form__summary-title">{t.summaryTitle}</p>
                 <ul>
-                  {FIELD_ORDER.filter((f) => errorFor(f)).map((f) => (
-                    <li key={f}>
-                      <a
-                        href={`#${id(f)}`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          focusField(f);
-                        }}
-                      >
-                        {labelFor(f, t)} — {message(f, errorFor(f)!)}
-                      </a>
-                    </li>
-                  ))}
+                  {summary
+                    .filter((x) => errorFor(x.field))
+                    .map((x) => (
+                      <li key={x.field}>
+                        <a
+                          href={`#${id(x.field)}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            focusField(x.field);
+                          }}
+                        >
+                          {labelFor(x.field, t)} — {message(x.field, x.code)}
+                        </a>
+                      </li>
+                    ))}
                 </ul>
               </div>
             )}
@@ -326,14 +346,14 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
 
             {values.attending === "yes" && (
               <div className="form__reveal">
-                <fieldset className="field field--group" data-field="dietary">
+                <fieldset className="field field--group" data-field="dietary" aria-describedby={id("dietary-hint")}>
                   <legend className="field__label">
                     {t.dietary} <span className="field__optional">({t.optional})</span>
                   </legend>
                   <p className="field__hint" id={id("dietary-hint")}>
                     {t.dietaryHint}
                   </p>
-                  <div className="choices choices--checks" aria-describedby={id("dietary-hint")}>
+                  <div className="choices choices--checks">
                     {DIETARY_OPTIONS.map((opt) => (
                       <label key={opt} className="choice choice--check" data-checked={values.dietary.includes(opt) || undefined}>
                         <input
@@ -360,7 +380,9 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
                   onChange={(v) => update("dietaryOther", v)}
                   onBlur={() => reveal("dietaryOther")}
                   autoComplete="off"
-                  maxLength={LIMITS.dietaryOther + 20}
+                  maxLength={LIMITS.dietaryOther * 5}
+                  counter={fill(t.counter, { n: [...values.dietaryOther].length, max: LIMITS.dietaryOther })}
+                  counterOver={[...values.dietaryOther].length > LIMITS.dietaryOther}
                 />
               </div>
             )}
@@ -374,7 +396,7 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
               onChange={(v) => update("message", v)}
               onBlur={() => reveal("message")}
               multiline
-              maxLength={LIMITS.message + 50}
+              maxLength={LIMITS.message * 5}
               counter={fill(t.counter, { n: [...values.message].length, max: LIMITS.message })}
               counterOver={[...values.message].length > LIMITS.message}
             />
@@ -388,7 +410,7 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
             </div>
 
             {status.kind === "failed" && (
-              <div className="form__failure" role="alert" tabIndex={-1} ref={failRef}>
+              <div className="form__failure" tabIndex={-1} ref={failRef}>
                 <p>{t.failure[status.code]}</p>
                 {contact && status.code !== "locked" && (
                   <p className="form__failure-contact">{fill(t.contactFallback, { name: contact.name, phone: contact.phone })}</p>
@@ -405,7 +427,7 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
               <button
                 type="submit"
                 className="btn btn--primary btn--wide"
-                disabled={status.kind === "sending"}
+                disabled={!ready || status.kind === "sending"}
                 aria-busy={status.kind === "sending"}
               >
                 {status.kind === "sending" ? t.sending : t.submit}
@@ -450,7 +472,7 @@ function Done({
   const yes = sent.attending === "yes";
   const diet = [...sent.dietary.map((d) => t.dietaryOptions[d]), sent.dietaryOther].filter(Boolean).join(", ");
   return (
-    <div className="done" role="status">
+    <div className="done">
       <h3 className="done__title" tabIndex={-1} ref={headingRef}>
         {yes ? t.thanksYes : t.thanksNo}
       </h3>
@@ -506,6 +528,26 @@ type TextFieldProps = {
   maxLength?: number;
 };
 
+/** Enter on a single-line field moves on, as its "next" key promises, instead of submitting. */
+function focusNextField(from: HTMLElement) {
+  const form = (from as HTMLInputElement).form;
+  if (!form) return;
+  const fields = Array.from(form.elements).filter((el): el is HTMLElement => {
+    if (!(el instanceof HTMLElement) || el.tabIndex < 0 || el.getClientRects().length === 0) return false;
+    if (el instanceof HTMLInputElement) {
+      if (el.disabled || el.type === "hidden") return false;
+      // In a radio group, only the checked radio (or the first, if none) is a tab stop.
+      if (el.type === "radio") {
+        const group = Array.from(form.querySelectorAll<HTMLInputElement>(`input[type=radio][name="${CSS.escape(el.name)}"]`));
+        const stop = group.find((r) => r.checked) ?? group[0];
+        return el === stop;
+      }
+    }
+    return !(el as HTMLButtonElement).disabled;
+  });
+  fields[fields.indexOf(from) + 1]?.focus();
+}
+
 function TextField(p: TextFieldProps) {
   const describedBy = [p.hint && `${p.id}-hint`, p.counter && `${p.id}-count`, p.error && `${p.id}-err`]
     .filter(Boolean)
@@ -544,6 +586,12 @@ function TextField(p: TextFieldProps) {
           autoCapitalize={p.autoCapitalize}
           spellCheck={p.type === "email" || p.type === "tel" ? false : undefined}
           enterKeyHint="next"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              focusNextField(e.currentTarget);
+            }
+          }}
         />
       )}
       {p.counter && (
@@ -586,10 +634,15 @@ function ChoiceGroup({ field, legend, name, value, options, error, onChange, lar
     <fieldset
       className={`field field--group${error ? " field--error" : ""}`}
       data-field={field}
+      role="radiogroup"
+      aria-labelledby={`${name}-legend`}
       aria-describedby={error ? errId : undefined}
       aria-required="true"
+      aria-invalid={error ? true : undefined}
     >
-      <legend className="field__label">{legend}</legend>
+      <legend className="field__label" id={`${name}-legend`}>
+        {legend}
+      </legend>
       <div className={`choices${large ? " choices--large" : ""}`}>
         {options.map((o, i) => (
           <label key={o.value} className="choice" data-checked={value === o.value || undefined}>

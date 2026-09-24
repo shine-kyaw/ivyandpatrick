@@ -39,7 +39,7 @@ const en = {
   },
   date: {
     long: "Sunday, 28 March 2027",
-    time: "11:00 – 11:30 in the morning",
+    time: "11:00 am – 1:30 pm",
   },
   details: {
     heading: "The Ceremony",
@@ -135,7 +135,7 @@ const en = {
       },
       {
         q: "What time is the ceremony?",
-        a: "The ceremony is from 11:00 to 11:30 in the morning.",
+        a: "The ceremony is from 11:00 in the morning until 1:30 in the afternoon.",
       },
       {
         q: "Can I change my reply?",

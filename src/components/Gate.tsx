@@ -6,12 +6,18 @@ import LangToggle, { useLang } from "./LangToggle";
 import { REVEAL_KEY } from "./keys";
 import type { GateStrings, Lang } from "./types";
 
-type Props = { initialLang: Lang; strings: Record<Lang, GateStrings> };
+type Props = {
+  initialLang: Lang;
+  strings: Record<Lang, GateStrings>;
+  initialError?: "empty" | "wrong" | "limited" | "forbidden";
+};
 type Status = "idle" | "sending" | "opening" | "empty" | "wrong" | "limited" | "error";
 
-export default function Gate({ initialLang, strings }: Props) {
+export default function Gate({ initialLang, strings, initialError }: Props) {
   const [lang, setLang] = useLang(initialLang);
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] = useState<Status>(
+    initialError === "forbidden" ? "error" : (initialError ?? "idle"),
+  );
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const id = useId();
@@ -40,7 +46,9 @@ export default function Gate({ initialLang, strings }: Props) {
         } catch {
           // private mode: the reveal simply doesn't play
         }
-        router.refresh();
+        // A no-JS attempt may have left ?gate=… in the address bar.
+        if (window.location.search) router.replace("/");
+        else router.refresh();
         return;
       }
       const next: Status = res.status === 429 ? "limited" : res.status === 401 ? "wrong" : res.status === 400 ? "empty" : "error";
@@ -79,7 +87,7 @@ export default function Gate({ initialLang, strings }: Props) {
           </h1>
           <p className="gate__invited">{t.invited}</p>
 
-          <form className="gate__form" onSubmit={onSubmit} noValidate>
+          <form className="gate__form" method="post" action="/api/unlock" onSubmit={onSubmit} noValidate>
             <label className="gate__label" htmlFor={`${id}-pw`}>
               {t.label}
             </label>

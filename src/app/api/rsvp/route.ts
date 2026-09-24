@@ -19,8 +19,8 @@ export async function POST(request: Request) {
   if (!isSameOrigin(request)) return fail("forbidden", 403);
   if (!(await isUnlocked())) return fail("locked", 401);
 
-  const limit = await rateLimit(`rsvp:${clientIp(request.headers)}`, 10, 600);
-  if (!limit.ok) return fail("rate_limited", 429);
+  // Generous: several guests may reply from one shared IP (office Wi-Fi, carrier NAT).
+  if (!(await rateLimit(`rsvp:${clientIp(request.headers)}`, 40, 600))) return fail("rate_limited", 429);
 
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) return fail("invalid", 413);
@@ -33,9 +33,12 @@ export async function POST(request: Request) {
   }
 
   // Bots: a filled honeypot or an instant submit is accepted and silently dropped.
-  const startedAt = typeof body.startedAt === "number" ? body.startedAt : 0;
+  // elapsedMs is measured on the guest's own device (never compared with our
+  // clock), and the form itself waits out the minimum, so real guests never
+  // land here.
+  const elapsedMs = typeof body.elapsedMs === "number" && Number.isFinite(body.elapsedMs) ? body.elapsedMs : 0;
   const honeypot = typeof body.website === "string" && body.website.length > 0;
-  if (honeypot || !startedAt || Date.now() - startedAt < MIN_FORM_MS) {
+  if (honeypot || elapsedMs < MIN_FORM_MS) {
     return NextResponse.json({ ok: true }, { headers: noStore });
   }
 

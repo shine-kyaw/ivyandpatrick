@@ -1,40 +1,54 @@
 import "server-only";
 
 /**
- * Fixed-window rate limit. Uses Upstash Redis over REST when
+ * Fixed-window counters. Uses Upstash Redis over REST when
  * UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are set, so limits hold
  * across serverless instances; otherwise falls back to per-instance memory,
  * which still blunts a single noisy client.
+ *
+ * Limits are generous on purpose: a family Viber group or an office Wi-Fi puts
+ * many real guests behind one public IP.
  */
-
-type Result = { ok: boolean; retryAfter: number };
 
 const memory = new Map<string, { count: number; resetAt: number }>();
 
-export async function rateLimit(key: string, limit: number, windowSec: number): Promise<Result> {
+function upstash(): { url: string; token: string } | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  return url && token ? { url, token } : null;
+}
 
-  if (url && token) {
-    try {
-      const res = await fetch(`${url}/pipeline`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify([
-          ["INCR", `rl:${key}`],
-          ["EXPIRE", `rl:${key}`, String(windowSec), "NX"],
-          ["TTL", `rl:${key}`],
-        ]),
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const [incr, , ttl] = (await res.json()) as { result: number }[];
-        return { ok: incr.result <= limit, retryAfter: Math.max(1, ttl.result) };
-      }
-    } catch {
-      // fall through to memory
-    }
+async function redis(commands: string[][]): Promise<{ result: unknown }[] | null> {
+  const cfg = upstash();
+  if (!cfg) return null;
+  try {
+    const res = await fetch(`${cfg.url}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(commands),
+      cache: "no-store",
+    });
+    return res.ok ? ((await res.json()) as { result: unknown }[]) : null;
+  } catch {
+    return null;
   }
+}
+
+/** Current count in the window, without adding to it. */
+export async function peek(key: string): Promise<number> {
+  const r = await redis([["GET", `rl:${key}`]]);
+  if (r) return Number(r[0]?.result ?? 0) || 0;
+  const entry = memory.get(key);
+  return entry && entry.resetAt > Date.now() ? entry.count : 0;
+}
+
+/** Adds one to the window's count and returns the new total. */
+export async function bump(key: string, windowSec: number): Promise<number> {
+  const r = await redis([
+    ["INCR", `rl:${key}`],
+    ["EXPIRE", `rl:${key}`, String(windowSec), "NX"],
+  ]);
+  if (r) return Number(r[0]?.result ?? 1) || 1;
 
   const now = Date.now();
   const entry = memory.get(key);
@@ -43,10 +57,15 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
     if (memory.size > 5000) {
       for (const [k, v] of memory) if (v.resetAt <= now) memory.delete(k);
     }
-    return { ok: true, retryAfter: 0 };
+    return 1;
   }
   entry.count += 1;
-  return { ok: entry.count <= limit, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
+  return entry.count;
+}
+
+/** Counts this request and reports whether it is still within the limit. */
+export async function rateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
+  return (await bump(key, windowSec)) <= limit;
 }
 
 export function clientIp(headers: Headers): string {

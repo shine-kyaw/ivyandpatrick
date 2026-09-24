@@ -54,7 +54,7 @@ function doPost(e) {
     } finally {
       lock.releaseLock();
     }
-    ensureSummary(ss);
+    updateSummary(ss);
     return json({ ok: true });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -78,31 +78,55 @@ function responsesSheet(ss) {
   return sheet;
 }
 
-/** A second tab with live totals. Counts raw rows: resolve duplicates by phone_digits. */
-function ensureSummary(ss) {
-  if (ss.getSheetByName("Summary")) return;
-  const s = ss.insertSheet("Summary");
-  const rows = [
-    ["Replies (all rows)", "=COUNTA(Responses!A2:A)"],
-    ["Accepting", '=COUNTIF(Responses!D2:D,"yes")'],
-    ["…bringing a guest", '=COUNTIFS(Responses!D2:D,"yes",Responses!E2:E,"yes")'],
-    ["Total guests attending", "=B2+B3"],
-    ["Declining", '=COUNTIF(Responses!D2:D,"no")'],
-    ["Late replies", '=COUNTIF(Responses!M2:M,"TRUE")'],
+/**
+ * The Summary tab, rebuilt after every reply. Every submission stays in
+ * Responses (nothing is overwritten); the headline totals use each guest's
+ * LATEST reply, matched by phone number, so a changed answer isn't counted twice.
+ */
+function updateSummary(ss) {
+  const responses = ss.getSheetByName("Responses");
+  const rows = responses.getLastRow() > 1 ? responses.getRange(2, 1, responses.getLastRow() - 1, HEADERS.length).getValues() : [];
+  const col = (name) => HEADERS.indexOf(name);
+
+  const latest = new Map();
+  rows.forEach((r) => {
+    const key = String(r[col("phone_digits")] || "").replace(/^'/, "") || "name:" + String(r[col("name")]).toLowerCase();
+    latest.set(key, r); // rows are in submission order, so the last one wins
+  });
+  const current = Array.from(latest.values());
+
+  const count = (list, fn) => list.filter(fn).length;
+  const yes = (r) => r[col("attending")] === "yes";
+  const guest = (r) => yes(r) && r[col("plus_one")] === "yes";
+  const diet = (list, opt) => count(list, (r) => yes(r) && String(r[col("dietary")]).split(", ").indexOf(opt) !== -1);
+
+  const table = [
+    ["Latest reply per guest (by phone)", ""],
+    ["Guests replied", current.length],
+    ["Accepting", count(current, yes)],
+    ["…bringing a guest", count(current, guest)],
+    ["Total people attending", count(current, yes) + count(current, guest)],
+    ["Declining", count(current, (r) => r[col("attending")] === "no")],
     ["", ""],
-    ["Dietary (per reply)", ""],
-    ["Vegetarian", '=COUNTIF(Responses!J2:J,"*vegetarian*")'],
-    ["Vegan", '=COUNTIF(Responses!J2:J,"*vegan*")'],
-    ["No beef", '=COUNTIF(Responses!J2:J,"*no-beef*")'],
-    ["No pork", '=COUNTIF(Responses!J2:J,"*no-pork*")'],
-    ["Halal", '=COUNTIF(Responses!J2:J,"*halal*")'],
-    ["Other notes", '=COUNTA(Responses!K2:K)'],
+    ["Dietary (people accepting)", ""],
+    ["Vegetarian", diet(current, "vegetarian")],
+    ["Vegan", diet(current, "vegan")],
+    ["No beef", diet(current, "no-beef")],
+    ["No pork", diet(current, "no-pork")],
+    ["Halal", diet(current, "halal")],
+    ["Other notes", count(current, (r) => yes(r) && String(r[col("dietary_other")]).trim() !== "")],
     ["", ""],
-    ["Possible duplicates (same phone)", "=COUNTA(Responses!H2:H)-COUNTUNIQUE(Responses!H2:H)"],
+    ["All submissions (including changed answers)", rows.length],
+    // Sheets may turn "TRUE" into a boolean on append, so compare case-insensitively.
+    ["Late replies", count(rows, (r) => String(r[col("late")]).toUpperCase() === "TRUE")],
   ];
-  s.getRange(1, 1, rows.length, 2).setValues(rows);
-  s.getRange("A1:A").setFontWeight("bold");
-  s.setColumnWidth(1, 260);
+
+  let sheet = ss.getSheetByName("Summary");
+  if (!sheet) sheet = ss.insertSheet("Summary");
+  sheet.clearContents();
+  sheet.getRange(1, 1, table.length, 2).setValues(table);
+  sheet.getRange("A1:A").setFontWeight("bold");
+  sheet.setColumnWidth(1, 300);
 }
 
 /** Never let a guest's text run as a formula. */
