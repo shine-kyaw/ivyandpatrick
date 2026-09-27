@@ -1,17 +1,13 @@
 /**
  * Patrick & Ivy — RSVP receiver for Google Sheets.
  *
- * SETUP (about 5 minutes, done once by the Sheet's owner):
- *  1. Create a Google Sheet in the account that should own the replies.
- *  2. Extensions → Apps Script. Delete the sample code, paste this whole file.
- *  3. Replace PASTE_A_LONG_RANDOM_SECRET below with a long random string.
- *  4. Deploy → New deployment → type "Web app".
- *       Execute as: Me.   Who has access: Anyone.
- *     Authorise when asked. Copy the Web app URL (ends in /exec).
- *  5. In Vercel → Project → Settings → Environment Variables (Production), add:
- *       RSVP_WEBHOOK_URL     = the /exec URL
- *       RSVP_WEBHOOK_SECRET  = the same secret as step 3
- *     then redeploy. Send one test reply and delete its row.
+ * Full step-by-step setup is in docs/SETUP.md,
+ * section 1. In short:
+ *  1. In the Google Sheet: Extensions → Apps Script, paste this whole file.
+ *  2. Replace PASTE_A_LONG_RANDOM_SECRET below with the secret Aster gave you.
+ *  3. Deploy → New deployment → Web app. Execute as: Me. Who has access: Anyone.
+ *  4. Copy the /exec URL into Vercel as RSVP_WEBHOOK_URL, the secret as
+ *     RSVP_WEBHOOK_SECRET, then redeploy the site.
  *
  * "Anyone" only means the website can reach this script; without the secret it
  * refuses to write, and it never returns sheet data.

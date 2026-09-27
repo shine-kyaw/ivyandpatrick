@@ -4,20 +4,61 @@ Guests should not receive the link until every box below is ticked.
 
 ## 1. Connect the Google Sheet (replies go nowhere without this)
 
-Follow the steps at the top of `scripts/google-apps-script.gs`. Then in
-Vercel → Project → Settings → Environment Variables (Production):
+Do this signed in to the Google account that should own the replies
+(suggested: patrickivy.rsvp@gmail.com). About 10 minutes, once.
 
-| Variable | Value |
-| --- | --- |
-| `RSVP_WEBHOOK_URL` | the Apps Script web-app URL ending in `/exec` |
-| `RSVP_WEBHOOK_SECRET` | the same long random secret pasted into the script |
+### A. Create the sheet and paste the script
 
-Redeploy, send one test reply, confirm the row, delete it.
+1. Go to <https://sheets.new>. Name the spreadsheet, e.g. "Patrick & Ivy — RSVPs".
+2. Menu **Extensions → Apps Script**. A code editor opens in a new tab.
+3. Delete everything in `Code.gs`, then paste the whole of
+   `scripts/google-apps-script.gs` from this repo.
+4. Near the top, replace `PASTE_A_LONG_RANDOM_SECRET` with a long random
+   secret (Aster generates one; never commit it). Keep the quotes.
+5. Click **Save** (disk icon). Name the project, e.g. "RSVP receiver".
 
-Until these are set the live form answers "Replies are not open just yet" —
-it never pretends a reply was saved.
+### B. Deploy it as a web app
 
-Optional:
+6. Top right: **Deploy → New deployment**.
+7. Click the gear next to "Select type" → **Web app**.
+8. Set **Execute as: Me** and **Who has access: Anyone**. (Anyone only means
+   the website can reach it; without the secret it refuses to write, and it
+   never returns sheet data.)
+9. Click **Deploy** → **Authorize access** → choose the account.
+   Google shows "Google hasn't verified this app": click **Advanced** →
+   **Go to RSVP receiver (unsafe)** → **Allow**. (It is your own script.)
+10. Copy the **Web app URL** (starts `https://script.google.com/macros/s/…`
+    and ends `/exec`).
+
+### C. Tell the website
+
+11. Vercel → the `ivyandpatrick` project → **Settings → Environment Variables**.
+    Add two variables, Environment **Production** (and Preview if wanted):
+
+    | Name | Value |
+    | --- | --- |
+    | `RSVP_WEBHOOK_URL` | the `/exec` URL from step 10 |
+    | `RSVP_WEBHOOK_SECRET` | the same secret as step 4 |
+
+12. **Deployments** → the latest deployment → **⋯ → Redeploy**
+    (environment variables only apply to new deployments).
+
+### D. Test
+
+13. Open the site, enter the password, send a test reply.
+14. In the sheet: a **Responses** tab appears with the row, and a **Summary**
+    tab with totals. Delete the test row, then use the sheet menu
+    **RSVP → Refresh summary** (reload the sheet once for the menu to appear).
+
+If the site says "Replies are not open just yet", a variable is missing or
+the redeploy hasn't run. If it says "We couldn't send your reply", the URL
+or secret doesn't match, or step 8 wasn't set to **Anyone**.
+
+**Changing the script later:** edit, save, then **Deploy → Manage
+deployments → ✏️ → Version: New version → Deploy**. The `/exec` URL stays the
+same, so Vercel needs no change.
+
+Optional variables:
 
 | Variable | Purpose |
 | --- | --- |
@@ -36,17 +77,19 @@ npm run password -- "the couple's choice" --write
 
 Commit and push. Every guest is then signed out and needs the new password.
 
-## 3. Facts still to confirm with the couple
+## 3. Wedding facts
 
-Run `npm run check:content`. As of the first build:
+All facts live in `src/content/wedding.ts`; `npm run check:content` lists
+anything missing. As of 2026-09-27 everything essential is filled:
 
-- [ ] Venue full address (English + Burmese) and Google Maps link
-- [ ] RSVP deadline date
-- [ ] Contact person: name, phone, Viber/WhatsApp
-- [ ] (optional) Timezone label, gifts note
-- [ ] Spelling: the printed card says "Partrick"; the site uses "Patrick"
+- Venue: Lotte Ballroom, LOTTE HOTEL YANGON (address and Google Maps place
+  from the hotel's own location page)
+- RSVP deadline: 1 November 2026 (placeholder — confirm with the couple)
+- Contact: patrickivy.rsvp@gmail.com (shown only past the password)
+- Optional, not set: gifts note
 
-Enter them in `src/content/wedding.ts`. Anything left `null` is simply not shown.
+Note: the printed card spells the groom's name "Partrick"; the site uses
+"Patrick". Only matters if the card is reprinted.
 
 ## 4. Burmese review
 

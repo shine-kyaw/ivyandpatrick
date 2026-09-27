@@ -41,6 +41,11 @@ export function Details({ lang, content }: Props) {
           <p className="detail__main" lang="en">
             {wedding.venue.name}
           </p>
+          {wedding.venue.hotel && (
+            <p className="detail__hotel" lang="en">
+              {wedding.venue.hotel}
+            </p>
+          )}
           <p className="detail__sub">{wedding.venue.address ? wedding.venue.address[lang] : d.addressPending}</p>
           {wedding.venue.mapUrl && (
             <a className="detail__action" href={wedding.venue.mapUrl} target="_blank" rel="noopener noreferrer">
@@ -95,24 +100,32 @@ export function Contact({ lang, content }: Props) {
   const c = content.wedding.contact;
   if (!c) return null;
   const t = content.dicts[lang].contact;
-  const digits = c.phone.replace(/\D/g, "");
+  const digits = c.phone?.replace(/\D/g, "") ?? "";
   return (
     <section className="contact" aria-labelledby="contact-title" data-rise>
       <h2 id="contact-title" className="contact__title">
         {t.heading}
       </h2>
-      <p className="contact__body">{fill(t.body, { name: c.name })}</p>
-      <p className="contact__phone">{c.phone}</p>
+      <p className="contact__body">{c.name ? fill(t.bodyNamed, { name: c.name }) : t.body}</p>
+      <p className="contact__email" lang="en">
+        <a href={`mailto:${c.email}`}>{c.email}</a>
+      </p>
+      {c.phone && <p className="contact__phone">{c.phone}</p>}
       <div className="contact__actions">
-        <a className="btn btn--ghost" href={telHref(c.phone)}>
-          {t.call}
+        <a className="btn btn--ghost" href={`mailto:${c.email}`}>
+          {t.email}
         </a>
-        {c.viber && (
+        {c.phone && (
+          <a className="btn btn--ghost" href={telHref(c.phone)}>
+            {t.call}
+          </a>
+        )}
+        {c.phone && c.viber && (
           <a className="btn btn--ghost" href={`viber://chat?number=%2B${digits}`}>
             {t.viber}
           </a>
         )}
-        {c.whatsapp && (
+        {c.phone && c.whatsapp && (
           <a className="btn btn--ghost" href={`https://wa.me/${digits}`} target="_blank" rel="noopener noreferrer">
             {t.whatsapp}
           </a>

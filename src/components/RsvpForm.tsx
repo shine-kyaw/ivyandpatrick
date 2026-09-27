@@ -414,7 +414,7 @@ export default function RsvpForm({ lang, content }: { lang: Lang; content: SiteC
               <div className="form__failure" tabIndex={-1} ref={failRef}>
                 <p>{t.failure[status.code]}</p>
                 {contact && status.code !== "locked" && (
-                  <p className="form__failure-contact">{fill(t.contactFallback, { name: contact.name, phone: contact.phone })}</p>
+                  <p className="form__failure-contact">{fill(t.contactFallback, { email: contact.email })}</p>
                 )}
                 {status.code === "locked" ? null : (
                   <button type="button" className="btn btn--ghost" onClick={() => submit()}>

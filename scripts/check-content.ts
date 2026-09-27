@@ -9,7 +9,7 @@ const missing: [string, boolean][] = [];
 if (!wedding.venue.address) missing.push(["Venue full address (EN + Burmese)", true]);
 if (!wedding.venue.mapUrl) missing.push(["Google Maps link for the venue", true]);
 if (!wedding.rsvpDeadline) missing.push(["RSVP deadline date", true]);
-if (!wedding.contact) missing.push(["Contact person: name + phone (Viber/WhatsApp?)", true]);
+if (!wedding.contact) missing.push(["Contact email (and optionally a name / phone)", true]);
 if (!wedding.timezoneLabel) missing.push(["Timezone label shown next to the time", false]);
 if (!wedding.gifts) missing.push(["Gifts note (EN + Burmese) — optional", false]);
 

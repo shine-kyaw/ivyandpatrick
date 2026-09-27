@@ -15,7 +15,14 @@ These were transcribed from the card image. Please check them letter by
 letter against the printed card — stacked consonants and tone marks are easy
 to mistype.
 
+Note: the time line reads နံနက် (၁၁:၀၀)နာရီ မှ (၁:၃၀)နာရီအထိ — the ceremony
+ends at 1:30. (An early draft of the site mistyped it as ၁၁:၃၀; fixed.)
+
 ## Drafted for the site (please review every line)
+
+Also drafted: the venue address in Burmese (`wedding.ts` → `venue.address.my`)
+and the timezone label မြန်မာစံတော်ချိန်.
+
 
 Everything in `src/content/my.ts` other than the items above: the password
 screen, section headings, form labels, options, hints, error messages,

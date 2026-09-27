@@ -894,6 +894,13 @@ a {
   line-height: 1.8;
 }
 
+.invite__hotel {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+
 .invite__actions {
   display: flex;
   flex-direction: column;
@@ -1035,6 +1042,13 @@ a {
   font-family: var(--f-my);
   font-size: 19px;
   line-height: 1.8;
+}
+
+.detail__hotel {
+  margin-top: 2px;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: var(--gold-ink);
 }
 
 .detail__sub {
@@ -1662,6 +1676,16 @@ textarea.field__input {
 .contact__body {
   margin-top: 6px;
   color: var(--ink-soft);
+}
+
+.contact__email {
+  margin-top: 6px;
+  font-size: 20px;
+}
+
+.contact__email a {
+  text-underline-offset: 5px;
+  text-decoration-color: var(--rail);
 }
 
 .contact__phone {

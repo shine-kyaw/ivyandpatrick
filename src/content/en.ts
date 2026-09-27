@@ -109,7 +109,7 @@ const en = {
       invalid: "Some answers need another look. Please check the form.",
     },
     retry: "Try again",
-    contactFallback: "If this keeps happening, please contact {name} on {phone}.",
+    contactFallback: "If this keeps happening, please email {email}.",
     thanksYes: "Thank you. We look forward to celebrating with you.",
     thanksNo: "Thank you for letting us know. You will be dearly missed.",
     summaryName: "Name",
@@ -138,6 +138,10 @@ const en = {
         a: "The ceremony is from 11:00 in the morning until 1:30 in the afternoon.",
       },
       {
+        q: "Where is the ceremony?",
+        a: "In the Lotte Ballroom at LOTTE HOTEL YANGON, Hlaing Township, Yangon. There is a map link in the ceremony details above.",
+      },
+      {
         q: "Can I change my reply?",
         a: "Of course. Simply send a new reply and the couple will see your latest answer.",
       },
@@ -145,7 +149,9 @@ const en = {
   },
   contact: {
     heading: "Questions about the day?",
-    body: "Please contact {name}.",
+    body: "Write to us any time, and we will get back to you.",
+    bodyNamed: "Please contact {name}.",
+    email: "Send an email",
     call: "Call",
     viber: "Viber",
     whatsapp: "WhatsApp",

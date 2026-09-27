@@ -109,7 +109,10 @@ export default function Hero({ lang, content, onViewCard }: Props) {
             </div>
             <div>
               <dt>{t.hero.venueLabel}</dt>
-              <dd lang="en">{wedding.venue.name}</dd>
+              <dd lang="en">
+                {wedding.venue.name}
+                {wedding.venue.hotel && <span className="invite__hotel">{wedding.venue.hotel}</span>}
+              </dd>
             </div>
             <div>
               <dt>{t.hero.dressLabel}</dt>

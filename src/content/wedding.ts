@@ -1,16 +1,20 @@
 /**
  * Every wedding fact on the site lives here and nowhere else.
  *
- * Source: the couple's printed invitation card (design/source/invitation-card.jpg).
+ * Sources: the couple's printed invitation card (design/source/invitation-card.jpg);
+ * the venue address and map from LOTTE HOTEL YANGON's own location page
+ * (lottehotel.com/yangon-hotel/en/about/location); deadline and contact email
+ * from Aster (2026-09-27).
  * A fact that is not on the card and not yet confirmed by the couple stays
  * `null` — the site then leaves it out rather than guessing. Run
  * `npm run check:content` to list what is still missing.
  */
 
 export type Contact = {
-  name: string;
-  /** International format, e.g. "+95 9 123 456 789". */
-  phone: string;
+  email: string;
+  name?: string;
+  /** International format, e.g. "+95 9 123 456 789". Optional. */
+  phone?: string;
   viber?: boolean;
   whatsapp?: boolean;
 };
@@ -20,12 +24,16 @@ export type Wedding = {
   date: string;
   ceremony: { start: string; end: string };
   venue: {
+    /** As printed on the card. */
     name: string;
+    hotel: string | null;
     address: { en: string; my: string } | null;
     mapUrl: string | null;
   };
   /** e.g. "Myanmar time (MMT)". Shown beside the time once known. */
   timezoneLabel: { en: string; my: string } | null;
+  /** Offset of the venue's local time from UTC, for the calendar file. */
+  utcOffset: string | null;
   /** ISO date; replies after this day are flagged as late (the form stays open). */
   rsvpDeadline: string | null;
   contact: Contact | null;
@@ -37,12 +45,19 @@ export const wedding: Wedding = {
   ceremony: { start: "11:00", end: "13:30" },
   venue: {
     name: "Lotte Ballroom",
-    address: null,
-    mapUrl: null,
+    hotel: "LOTTE HOTEL YANGON",
+    address: {
+      en: "No. 82, Sin Phyu Shin Avenue, Pyay Road, 6½ Mile, Ward 11, Hlaing Township, Yangon, Myanmar",
+      // Draft Burmese rendering — for the native reviewer.
+      my: "အမှတ် ၈၂၊ ဆင်ဖြူရှင်လမ်း၊ ပြည်လမ်း၊ ၆ မိုင်ခွဲ၊ (၁၁) ရပ်ကွက်၊ လှိုင်မြို့နယ်၊ ရန်ကုန်မြို့",
+    },
+    // The hotel's Google Maps place (CID), which opens in each guest's own language.
+    mapUrl: "https://www.google.com/maps?cid=2080895687428039804",
   },
-  timezoneLabel: null,
-  rsvpDeadline: null,
-  contact: null,
+  timezoneLabel: { en: "Myanmar time", my: "မြန်မာစံတော်ချိန်" },
+  utcOffset: "+06:30",
+  rsvpDeadline: "2026-11-01",
+  contact: { email: "patrickivy.rsvp@gmail.com" },
   gifts: null,
 };
 

@@ -3,15 +3,20 @@ import { isUnlocked } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-const stamp = (date: string, time: string) => `${date.replaceAll("-", "")}T${time.replace(":", "")}00`;
+const floating = (date: string, time: string) => `${date.replaceAll("-", "")}T${time.replace(":", "")}00`;
+
+/** Venue-local date + time → UTC "YYYYMMDDTHHMMSSZ", so every guest's calendar shows the right local hour. */
+const utc = (date: string, time: string, offset: string) =>
+  new Date(`${date}T${time}:00${offset}`).toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+
+const stamp = (date: string, time: string) =>
+  wedding.utcOffset ? utc(date, time, wedding.utcOffset) : floating(date, time);
 const esc = (s: string) => s.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
 
 export async function GET() {
   if (!(await isUnlocked())) return new Response("Not found", { status: 404 });
 
-  const location = [wedding.venue.name, wedding.venue.address?.en].filter(Boolean).join(", ");
-  // Floating local times (no TZID): the ceremony is at 11:00 wherever it is held,
-  // so calendars show the wall-clock time printed on the card.
+  const location = [wedding.venue.name, wedding.venue.hotel, wedding.venue.address?.en].filter(Boolean).join(", ");
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -19,6 +24,7 @@ export async function GET() {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
+    ...(wedding.venue.mapUrl ? [`URL:${wedding.venue.mapUrl}`] : []),
     "UID:ceremony-20270328@patrick-and-ivy",
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
     `DTSTART:${stamp(wedding.date, wedding.ceremony.start)}`,
